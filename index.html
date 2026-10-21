@@ -235,8 +235,8 @@
   </div>
 
   <script>
-    // URL Única do seu Google Apps Script como API
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx3aHdpoRLxSEgyITHbAEEgZBvjjuHbeIzLYPpGShYUNoYSS3NzBfcJd0bTnCa5ISA/exec";
+    // URL Atualizada do Google Apps Script
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwFUr9-t599-VX5aPqCG79oJ6HkHwltaDUV5usNx21Sz7IwbhnoYJ4ZzhGlPqSgTgWx/exec";
 
     let dadosMesas = [];
     let filtroAtual = 'todos';
@@ -253,8 +253,7 @@
           }
         })
         .catch(err => {
-          console.error("Erro ao carregar dados da planilha:", err);
-          // Fallback seguro de exibição rápida
+          console.error("Erro ao carregar dados:", err);
           if (dadosMesas.length === 0) {
             const CONCLUIDAS_INICIAIS = [5, 6, 8, 11, 12, 13, 14, 17, 18, 22];
             for (let i = 1; i <= 32; i++) {
@@ -378,7 +377,6 @@
         observacao: ob
       };
 
-      // Envia via POST diretamente para a Planilha do Google
       fetch(SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
@@ -390,7 +388,9 @@
         dadosMesas[num - 1].status = st;
         dadosMesas[num - 1].foto = ft;
         dadosMesas[num - 1].observacao = ob;
-        render();
+        
+        // Recarrega os dados em 2 segundos para trazer a URL pública gerada no Drive
+        setTimeout(carregarDadosPlanilha, 2000);
       })
       .catch(err => {
         btn.innerText = 'Salvar Alterações';
