@@ -139,6 +139,7 @@
       color: #000; font-weight: 700; border: none; padding: 10px; border-radius: 8px;
       cursor: pointer; font-size: 0.8rem; transition: 0.2s;
     }
+    .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
 
     .file-input-label {
       background: rgba(255,255,255,0.05); color: var(--text-muted); text-align: center;
@@ -235,7 +236,6 @@
   </div>
 
   <script>
-    // URL Atualizada do Google Apps Script
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwFUr9-t599-VX5aPqCG79oJ6HkHwltaDUV5usNx21Sz7IwbhnoYJ4ZzhGlPqSgTgWx/exec";
 
     let dadosMesas = [];
@@ -253,7 +253,7 @@
           }
         })
         .catch(err => {
-          console.error("Erro ao carregar dados:", err);
+          console.error("Erro ao carregar dados da planilha:", err);
           if (dadosMesas.length === 0) {
             const CONCLUIDAS_INICIAIS = [5, 6, 8, 11, 12, 13, 14, 17, 18, 22];
             for (let i = 1; i <= 32; i++) {
@@ -349,14 +349,34 @@
       }
     }
 
+    // Otimização: Comprime imagens pesadas no navegador antes do upload
     function handleFileUpload(event, num) {
       const file = event.target.files[0];
       if (file) {
         const reader = new FileReader();
         reader.onload = function(e) {
-          const base64 = e.target.result;
-          document.getElementById(`foto-${num}`).value = base64;
-          document.getElementById(`img-preview-${num}`).innerHTML = `<img src="${base64}">`;
+          const img = new Image();
+          img.src = e.target.result;
+          img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const maxWidth = 800;
+            const scaleSize = maxWidth / img.width;
+            
+            if (scaleSize < 1) {
+              canvas.width = maxWidth;
+              canvas.height = img.height * scaleSize;
+            } else {
+              canvas.width = img.width;
+              canvas.height = img.height;
+            }
+
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+
+            document.getElementById(`foto-${num}`).value = compressedBase64;
+            document.getElementById(`img-preview-${num}`).innerHTML = `<img src="${compressedBase64}">`;
+          };
         };
         reader.readAsDataURL(file);
       }
@@ -365,10 +385,16 @@
     function salvarMesa(num) {
       const btn = document.getElementById(`btn-save-${num}`);
       btn.innerText = 'Salvando na nuvem...';
+      btn.disabled = true;
 
       const st = document.getElementById(`status-${num}`).value;
       const ft = document.getElementById(`foto-${num}`).value;
       const ob = document.getElementById(`obs-${num}`).value;
+
+      // Atualiza o estado local imediatamente
+      dadosMesas[num - 1].status = st;
+      dadosMesas[num - 1].foto = ft;
+      dadosMesas[num - 1].observacao = ob;
 
       const payload = {
         numeroMesa: num,
@@ -385,15 +411,15 @@
       })
       .then(() => {
         btn.innerText = 'Salvar Alterações';
-        dadosMesas[num - 1].status = st;
-        dadosMesas[num - 1].foto = ft;
-        dadosMesas[num - 1].observacao = ob;
-        
-        // Recarrega os dados em 2 segundos para trazer a URL pública gerada no Drive
-        setTimeout(carregarDadosPlanilha, 2000);
+        btn.disabled = false;
+        render();
+
+        // Sincroniza a versão pública da planilha do Google após o upload do Drive concluir
+        setTimeout(carregarDadosPlanilha, 5000);
       })
       .catch(err => {
         btn.innerText = 'Salvar Alterações';
+        btn.disabled = false;
         console.error("Erro ao salvar:", err);
       });
     }
