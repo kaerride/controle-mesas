@@ -235,36 +235,40 @@
   </div>
 
   <script>
-    const CONCLUIDAS_INICIAIS = [5, 6, 8, 11, 12, 13, 14, 17, 18, 22];
+    // URL Única do seu Google Apps Script como API
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx3aHdpoRLxSEgyITHbAEEgZBvjjuHbeIzLYPpGShYUNoYSS3NzBfcJd0bTnCa5ISA/exec";
+
     let dadosMesas = [];
     let filtroAtual = 'todos';
     let donutChart = null;
     let barChart = null;
 
-    function carregarDados() {
-      const salvo = localStorage.getItem('penso_mesas_data');
-      if (salvo) {
-        try {
-          dadosMesas = JSON.parse(salvo);
-          return;
-        } catch(e) {}
-      }
-      
-      dadosMesas = [];
-      for (let i = 1; i <= 32; i++) {
-        dadosMesas.push({
-          mesa: 'Mesa ' + i,
-          status: CONCLUIDAS_INICIAIS.includes(i) ? 'Concluída' : 'Pendente',
-          foto: '',
-          observacao: '',
-          ultimaAtualizacao: new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})
+    function carregarDadosPlanilha() {
+      fetch(SCRIPT_URL)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data) && data.length > 0) {
+            dadosMesas = data;
+            render();
+          }
+        })
+        .catch(err => {
+          console.error("Erro ao carregar dados da planilha:", err);
+          // Fallback seguro de exibição rápida
+          if (dadosMesas.length === 0) {
+            const CONCLUIDAS_INICIAIS = [5, 6, 8, 11, 12, 13, 14, 17, 18, 22];
+            for (let i = 1; i <= 32; i++) {
+              dadosMesas.push({
+                mesa: 'Mesa ' + i,
+                status: CONCLUIDAS_INICIAIS.includes(i) ? 'Concluída' : 'Pendente',
+                foto: '',
+                observacao: '',
+                ultimaAtualizacao: ''
+              });
+            }
+            render();
+          }
         });
-      }
-      salvarStorage();
-    }
-
-    function salvarStorage() {
-      localStorage.setItem('penso_mesas_data', JSON.stringify(dadosMesas));
     }
 
     function render() {
@@ -360,17 +364,38 @@
     }
 
     function salvarMesa(num) {
+      const btn = document.getElementById(`btn-save-${num}`);
+      btn.innerText = 'Salvando na nuvem...';
+
       const st = document.getElementById(`status-${num}`).value;
       const ft = document.getElementById(`foto-${num}`).value;
       const ob = document.getElementById(`obs-${num}`).value;
 
-      dadosMesas[num - 1].status = st;
-      dadosMesas[num - 1].foto = ft;
-      dadosMesas[num - 1].observacao = ob;
-      dadosMesas[num - 1].ultimaAtualizacao = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+      const payload = {
+        numeroMesa: num,
+        status: st,
+        foto: ft,
+        observacao: ob
+      };
 
-      salvarStorage();
-      render();
+      // Envia via POST diretamente para a Planilha do Google
+      fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(() => {
+        btn.innerText = 'Salvar Alterações';
+        dadosMesas[num - 1].status = st;
+        dadosMesas[num - 1].foto = ft;
+        dadosMesas[num - 1].observacao = ob;
+        render();
+      })
+      .catch(err => {
+        btn.innerText = 'Salvar Alterações';
+        console.error("Erro ao salvar:", err);
+      });
     }
 
     function renderGaleria() {
@@ -463,7 +488,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-      carregarDados();
+      carregarDadosPlanilha();
 
       document.getElementById('btn-tab-mesas').addEventListener('click', function() {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -492,8 +517,6 @@
       document.getElementById('filter-concluida').addEventListener('click', function() { setFiltro('Concluída', this); });
 
       document.getElementById('btn-export-csv').addEventListener('click', exportarRelatorioCSV);
-
-      render();
     });
   </script>
 </body>
