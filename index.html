@@ -139,12 +139,6 @@
       color: #000; font-weight: 700; border: none; padding: 10px; border-radius: 8px;
       cursor: pointer; font-size: 0.8rem; transition: 0.2s;
     }
-    .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .file-input-label {
-      background: rgba(255,255,255,0.05); color: var(--text-muted); text-align: center;
-      padding: 6px; border-radius: 8px; font-size: 0.75rem; cursor: pointer; border: 1px solid var(--card-border);
-    }
 
     .galeria-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
     .galeria-card {
@@ -243,6 +237,16 @@
     let donutChart = null;
     let barChart = null;
 
+    // Converte automaticamente qualquer link do Drive para a Thumbnail API garantida
+    function formatarUrlImagem(url) {
+      if (!url) return '';
+      let match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+      }
+      return url;
+    }
+
     function carregarDadosPlanilha() {
       fetch(SCRIPT_URL)
         .then(res => res.json())
@@ -252,22 +256,7 @@
             render();
           }
         })
-        .catch(err => {
-          console.error("Erro ao carregar dados da planilha:", err);
-          if (dadosMesas.length === 0) {
-            const CONCLUIDAS_INICIAIS = [5, 6, 8, 11, 12, 13, 14, 17, 18, 22];
-            for (let i = 1; i <= 32; i++) {
-              dadosMesas.push({
-                mesa: 'Mesa ' + i,
-                status: CONCLUIDAS_INICIAIS.includes(i) ? 'Concluída' : 'Pendente',
-                foto: '',
-                observacao: '',
-                ultimaAtualizacao: ''
-              });
-            }
-            render();
-          }
-        });
+        .catch(err => console.error("Erro ao carregar dados:", err));
     }
 
     function render() {
@@ -301,6 +290,8 @@
         if (m.status === 'Concluída') badgeClass = 'status-done';
         if (m.status === 'Em Atendimento') badgeClass = 'status-progress';
 
+        const imgUrl = formatarUrlImagem(m.foto);
+
         const card = document.createElement('div');
         card.className = 'mesa-card';
         card.innerHTML = `
@@ -310,7 +301,7 @@
           </div>
           
           <div class="img-container" id="img-preview-${num}">
-            ${m.foto ? `<img src="${m.foto}" alt="Foto ${m.mesa}">` : `<div class="img-placeholder">📷 Nenhuma imagem<br>anexada</div>`}
+            ${imgUrl ? `<img src="${imgUrl}" alt="Foto ${m.mesa}">` : `<div class="img-placeholder">📷 Nenhuma imagem<br>anexada</div>`}
           </div>
 
           <div class="card-actions">
@@ -320,13 +311,7 @@
               <option value="Concluída" ${m.status === 'Concluída' ? 'selected' : ''}>🟢 Concluída</option>
             </select>
 
-            <input type="text" id="foto-${num}" placeholder="Link da Foto (Drive / URL)" value="${m.foto || ''}">
-            
-            <label class="file-input-label">
-              📁 Upload Foto do PC
-              <input type="file" accept="image/*" style="display:none;" id="file-${num}">
-            </label>
-
+            <input type="text" id="foto-${num}" placeholder="Link da Foto" value="${m.foto || ''}">
             <input type="text" id="obs-${num}" placeholder="Observação / Chamado" value="${m.observacao || ''}">
 
             <button class="btn-save" id="btn-save-${num}">Salvar Alterações</button>
@@ -336,55 +321,12 @@
         grid.appendChild(card);
 
         document.getElementById(`btn-save-${num}`).addEventListener('click', () => salvarMesa(num));
-        document.getElementById(`foto-${num}`).addEventListener('change', () => previewUrl(num));
-        document.getElementById(`file-${num}`).addEventListener('change', (e) => handleFileUpload(e, num));
       });
-    }
-
-    function previewUrl(num) {
-      const url = document.getElementById(`foto-${num}`).value;
-      const preview = document.getElementById(`img-preview-${num}`);
-      if (url) {
-        preview.innerHTML = `<img src="${url}">`;
-      }
-    }
-
-    function handleFileUpload(event, num) {
-      const file = event.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const img = new Image();
-          img.src = e.target.result;
-          img.onload = function() {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const maxWidth = 800;
-            const scaleSize = maxWidth / img.width;
-            
-            if (scaleSize < 1) {
-              canvas.width = maxWidth;
-              canvas.height = img.height * scaleSize;
-            } else {
-              canvas.width = img.width;
-              canvas.height = img.height;
-            }
-
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-
-            document.getElementById(`foto-${num}`).value = compressedBase64;
-            document.getElementById(`img-preview-${num}`).innerHTML = `<img src="${compressedBase64}">`;
-          };
-        };
-        reader.readAsDataURL(file);
-      }
     }
 
     function salvarMesa(num) {
       const btn = document.getElementById(`btn-save-${num}`);
-      btn.innerText = 'Salvando na nuvem...';
-      btn.disabled = true;
+      btn.innerText = 'Salvando...';
 
       const st = document.getElementById(`status-${num}`).value;
       const ft = document.getElementById(`foto-${num}`).value;
@@ -409,15 +351,10 @@
       })
       .then(() => {
         btn.innerText = 'Salvar Alterações';
-        btn.disabled = false;
         render();
-        
-        // Faz o re-fetch para garantir persistência após gravação da planilha
-        setTimeout(carregarDadosPlanilha, 4000);
       })
       .catch(err => {
         btn.innerText = 'Salvar Alterações';
-        btn.disabled = false;
         console.error("Erro ao salvar:", err);
       });
     }
@@ -434,9 +371,10 @@
       }
 
       fotos.forEach(m => {
+        const imgUrl = formatarUrlImagem(m.foto);
         galeria.innerHTML += `
           <div class="galeria-card">
-            <img src="${m.foto}" alt="Evidência ${m.mesa}">
+            <img src="${imgUrl}" alt="Evidência ${m.mesa}">
             <div class="galeria-info">
               <strong style="color: var(--primary-green); display: block; margin-bottom: 5px;">${m.mesa}</strong>
               <div style="font-size: 0.8rem; color: var(--text-muted);">${m.observacao || 'Sem observações'}</div>
@@ -456,7 +394,7 @@
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `Relatorio_Atendimento_Andra_${new Date().toLocaleDateString('pt-BR')}.csv`;
+      link.download = `Relatorio_Andra_${new Date().toLocaleDateString('pt-BR')}.csv`;
       link.click();
     }
 
