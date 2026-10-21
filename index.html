@@ -236,7 +236,7 @@
   </div>
 
   <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwFUr9-t599-VX5aPqCG79oJ6HkHwltaDUV5usNx21Sz7IwbhnoYJ4ZzhGlPqSgTgWx/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzF-R5-5ctBFX57B9pcrC5SimPoQ2nbm37iy6dAow_6LWep4PdtK0XTi8yNgU5bhTlQ/exec";
 
     let dadosMesas = [];
     let filtroAtual = 'todos';
@@ -349,7 +349,6 @@
       }
     }
 
-    // Otimização: Comprime imagens pesadas no navegador antes do upload
     function handleFileUpload(event, num) {
       const file = event.target.files[0];
       if (file) {
@@ -391,7 +390,6 @@
       const ft = document.getElementById(`foto-${num}`).value;
       const ob = document.getElementById(`obs-${num}`).value;
 
-      // Atualiza o estado local imediatamente
       dadosMesas[num - 1].status = st;
       dadosMesas[num - 1].foto = ft;
       dadosMesas[num - 1].observacao = ob;
@@ -413,9 +411,9 @@
         btn.innerText = 'Salvar Alterações';
         btn.disabled = false;
         render();
-
-        // Sincroniza a versão pública da planilha do Google após o upload do Drive concluir
-        setTimeout(carregarDadosPlanilha, 5000);
+        
+        // Faz o re-fetch para garantir persistência após gravação da planilha
+        setTimeout(carregarDadosPlanilha, 4000);
       })
       .catch(err => {
         btn.innerText = 'Salvar Alterações';
